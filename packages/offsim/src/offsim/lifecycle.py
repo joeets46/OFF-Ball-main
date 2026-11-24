@@ -73,6 +73,8 @@ def redeliver(sink, world: World, match: Match) -> int:
     sink.supersede_captures(match.match_id)
     for capture in world.captures(match, delivery_version=version):
         sink.write_recording(world.record(capture))
+    # The actions stay as detected; only the frames they point at move.
+    sink.relink_actions(match.match_id)
     return version
 
 

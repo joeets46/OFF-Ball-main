@@ -146,6 +146,31 @@ class PostgresSink:
             self.conn.execute("UPDATE tracking.capture SET is_current = FALSE "
                               "WHERE match_id = %s AND is_current", [match_id])
 
+    def relink_actions(self, match_id: int) -> None:
+        """Point a match's actions and zones at the same frame numbers in its
+        current primary capture. A re-delivery numbers its frames like the old one."""
+        def now(old: str) -> str:
+            return f"""(SELECT f.frame_id FROM tracking.frame f
+                          JOIN tracking.capture c ON c.capture_id = f.capture_id
+                         WHERE c.match_id = %(match_id)s AND c.is_current AND c.is_primary
+                           AND f.frame_number = (SELECT o.frame_number FROM tracking.frame o
+                                                  WHERE o.frame_id = {old}))"""
+
+        with self.conn.transaction(), self.conn.cursor() as cur:
+            cur.execute(f"""
+                UPDATE tracking.off_ball_action a
+                   SET start_frame_id = {now("a.start_frame_id")},
+                       end_frame_id = {now("a.end_frame_id")}
+                 WHERE a.match_id = %(match_id)s AND a.start_frame_id IS NOT NULL""",
+                {"match_id": match_id})
+            cur.execute(f"""
+                UPDATE tracking.off_ball_action_zone z
+                   SET entered_frame_id = {now("z.entered_frame_id")}
+                  FROM tracking.off_ball_action a
+                 WHERE a.off_ball_action_id = z.off_ball_action_id
+                   AND a.match_id = %(match_id)s AND z.entered_frame_id IS NOT NULL""",
+                {"match_id": match_id})
+
     # -- helpers ------------------------------------------------------------
 
     def _copy(self, table: str, rows: list[dict]) -> None:

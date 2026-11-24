@@ -41,14 +41,21 @@ DQ_CHECKS: tuple[tuple[str, str, str], ...] = (
         """,
     ),
     (
-        "off-ball actions point at frames of their own match",
-        "actions resolved against the wrong capture",
+        "off-ball actions point at their match's current primary capture",
+        "actions resolved against the wrong capture, or left behind by a re-delivery",
         """
         SELECT a.off_ball_action_id
         FROM tracking.off_ball_action a
         JOIN tracking.frame f ON f.frame_id IN (a.start_frame_id, a.end_frame_id)
         JOIN tracking.capture c ON c.capture_id = f.capture_id
-        WHERE c.match_id <> a.match_id
+        WHERE NOT (c.match_id = a.match_id AND c.is_current AND c.is_primary)
+        UNION ALL
+        SELECT z.off_ball_action_id
+        FROM tracking.off_ball_action_zone z
+        JOIN tracking.off_ball_action a ON a.off_ball_action_id = z.off_ball_action_id
+        JOIN tracking.frame f ON f.frame_id = z.entered_frame_id
+        JOIN tracking.capture c ON c.capture_id = f.capture_id
+        WHERE NOT (c.match_id = a.match_id AND c.is_current AND c.is_primary)
         """,
     ),
 )

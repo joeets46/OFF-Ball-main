@@ -16,7 +16,7 @@ import pytest
 from offsim.backfill import backfill, reset_database
 from offsim.cli import main as cli_main
 from offsim.config import database_url
-from offsim.dq import change_log_summary, run_dq_checks
+from offsim.dq import DQ_CHECKS, change_log_summary, run_dq_checks
 from offsim.lifecycle import redeliver, rerun_detection
 from offsim.sink import PostgresSink
 from offsim.stream import run_stream
@@ -26,6 +26,7 @@ pytestmark = pytest.mark.database
 
 TEST_DATABASE = "offball_sim_test"
 CHECK = [name for name, _, _ in BUSINESS_CHECKS]
+DQ = [name for name, _, _ in DQ_CHECKS]
 
 
 @pytest.fixture(scope="module")
@@ -50,6 +51,10 @@ def sim(make_world):
 
 def _failing(conn) -> set[str]:
     return {r.name for r in run_business_checks(conn) if not r.passed}
+
+
+def _dq_failing(conn) -> set[str]:
+    return {r.name for r in run_dq_checks(conn) if not r.passed}
 
 
 def _count(conn, table: str, where: str = "TRUE") -> int:
@@ -127,6 +132,23 @@ def test_each_trap_trips_its_own_check(sim, breakage):
     assert _failing(conn) == set()
 
 
+def test_action_on_another_capture_of_its_match_fails_dq(sim):
+    """Same match, wrong capture: the GPS one, not the current primary."""
+    conn = sim[0]
+    with conn.transaction(force_rollback=True):
+        conn.execute("""
+            UPDATE tracking.off_ball_action a
+               SET start_frame_id = g.first_id, end_frame_id = g.last_id
+              FROM (SELECT c.match_id, min(f.frame_id) AS first_id, max(f.frame_id) AS last_id
+                      FROM tracking.capture c JOIN tracking.frame f USING (capture_id)
+                     WHERE c.capture_method = 'gps' GROUP BY c.match_id) g
+             WHERE a.off_ball_action_id = (
+                   SELECT min(b.off_ball_action_id) FROM tracking.off_ball_action b
+                    WHERE b.match_id = g.match_id AND b.start_frame_id IS NOT NULL)""")
+        assert _dq_failing(conn) == {DQ[3]}
+    assert _dq_failing(conn) == set()
+
+
 # -- lifecycle -----------------------------------------------------------------
 
 def test_redelivery_keeps_one_current_capture(sim):
@@ -138,6 +160,7 @@ def test_redelivery_keeps_one_current_capture(sim):
     assert _count(conn, "capture",
                   f"match_id = {match.match_id} AND is_current AND delivery_version = 1") == 0
     assert _failing(conn) == set()
+    assert _dq_failing(conn) == set(), "actions follow the match to its new capture"
 
 
 def test_model_rerun_really_deletes(sim):

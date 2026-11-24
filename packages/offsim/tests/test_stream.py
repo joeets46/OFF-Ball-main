@@ -35,6 +35,9 @@ class FakeSink:
     def write_recording(self, recording) -> None:
         self.captures.append(recording.capture)
 
+    def relink_actions(self, match_id: int) -> None:
+        pass
+
 
 def _redetect_key(world) -> tuple[int, int]:
     """A tick key whose roll -- the stream's first draw -- picks a redetect."""
