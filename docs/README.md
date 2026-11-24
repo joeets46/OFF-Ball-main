@@ -8,14 +8,14 @@ Read in order for the full argument, or jump to what you need.
 |--:|---|---|
 | 01 | [01-conceptual-model.md](01-conceptual-model.md) | 64 business entities, 5 subject areas, no attributes |
 | 02 | [02-logical-model.md](02-logical-model.md) | 176 entities in 3NF, supertypes, 34 associative entities |
-| 03 | [03-physical-model-oltp.md](03-physical-model-oltp.md) | 10 PostgreSQL 18 schemas, 255 tables |
+| 03 | [03-physical-model-oltp.md](03-physical-model-oltp.md) | 11 PostgreSQL 18 schemas, 267 tables |
 | 04 | [04-physical-model-target.md](04-physical-model-target.md) | The upstream Databricks model as a constraint, plus its two measured defects |
 
 ## Reference
 
 | # | Doc | Contents |
 |--:|---|---|
-| 05 | [05-source-systems.md](05-source-systems.md) | The ten systems, how ownership was assigned, what makes each distinctive |
+| 05 | [05-source-systems.md](05-source-systems.md) | The eleven systems, how ownership was assigned, what makes each distinctive |
 | 06 | [06-conventions.md](06-conventions.md) | Naming, keys, types, value domains, privacy, audit, constraints, indexes, partitioning |
 | 07 | [07-integration-contract.md](07-integration-contract.md) | The five hard problems a pipeline has to solve, and the per-system traps |
 | 08 | [08-scope-boundary.md](08-scope-boundary.md) | Why 47 of 200 target tables are out of scope, and the one compromise |

@@ -53,8 +53,8 @@ Databricks declares `PRIMARY KEY` and `FOREIGN KEY` but does not enforce them.
 Duplicate or orphaned rows load silently.
 
 That shifts the burden entirely upstream: **this tier enforces what the target
-cannot**. 341 enforced primary keys, 504 enforced foreign keys, 925 `CHECK`
-constraints and 150 unique constraints, all verified by
+cannot**. 304 enforced primary keys, 546 enforced foreign keys, 973 `CHECK`
+constraints and 107 unique constraints, all verified by
 `tests/test_schemas_load.py`. If a constraint is going to catch anything, it
 has to catch it here.
 
@@ -194,6 +194,9 @@ documented at the relevant source table.
 | Athlete pay components | `sap_sfsf.emp_pay_component` | `athlete.contract` has one value column |
 | The reason for a squad change | `sap_sfsf.emp_job.event_reason` | `athlete.roster` keeps none of it |
 | A no-show | `admission` vs `access_grant` | Both exist upstream, but the gap is only computable if both are loaded |
+| Where a player was without the ball | `tracking.player_frame_position` | No target table holds a player position at all |
+| The run that created the shot | `tracking.off_ball_action.led_to_hudl_instance_id` | The target has no off-ball concept; `event.scoring_event` records the shot alone |
+| Who had the ball, frame by frame | `tracking.frame.ball_carrier_player_id` | `tracking` is source-only, so none of its tables has a target to load into |
 
 None of these is an argument against the target model. A Silver-layer
 analytical model is *supposed* to be denormalized, and most of these facts

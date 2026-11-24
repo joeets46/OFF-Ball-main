@@ -1,9 +1,10 @@
-# The ten source systems
+# The eleven source systems
 
 The upstream model names its own systems of record in
-`model.operational_systems_of_records`. This project models exactly those ten,
-and no others — see [08-scope-boundary.md](08-scope-boundary.md) for what that
-costs.
+`model.operational_systems_of_records`. This project models exactly those ten —
+see [08-scope-boundary.md](08-scope-boundary.md) for what that costs — plus one
+**source-only** system the upstream model does not name, `tracking`, described
+[below](#the-source-only-system-tracking).
 
 Verbatim, as the upstream model lists them:
 
@@ -31,6 +32,7 @@ Verbatim, as the upstream model lists them:
 | [`sap_sfsf`](../models/physical/sap_sfsf/) | SAP SuccessFactors | B | 7 | 19 | API incremental on `last_modified_on` |
 | [`hudl`](../models/physical/hudl/) | SportsCode / Hudl | A | 5 | 22 | API incremental |
 | [`workday_ap`](../models/physical/workday_ap/) | Workday Adaptive Planning | B | 2 | 12 | API snapshot per version |
+| [`tracking`](../models/physical/tracking/) | Football player tracking (optical / GPS) | A | **0** | 12 | File per match |
 
 **Tier A** carries full DDL: complete column sets, every constraint, indexes,
 partitioning, audit triggers. **Tier B** is abbreviated by design — key
@@ -42,6 +44,36 @@ One deviation from the original plan: **Dalet was promoted from Tier B to Tier
 A** once the ownership map was complete, because it turned out to own 20 target
 tables — more than Archtics, Shopify, AEP or Hudl. The plan had guessed it was
 peripheral; the measurement said otherwise.
+
+## The source-only system: tracking
+
+`tracking` is football player tracking: optical cameras or GPS vests recording
+every player and the ball 25 times a second, and the off-ball actions — runs,
+presses, marks — derived from those frames. It is the one system here that the
+upstream model does not name, and it **owns no target table**. That is a
+measured fact, not an omission:
+
+- No upstream column mentions player tracking, optical tracking or tracking
+  data, so its affinity score is zero everywhere. (The bare word "tracking"
+  matches 585 columns — cost tracking, order tracking — which is why
+  `tools/scope.py` uses a narrower pattern: the loose one would invent an
+  ownership signal.)
+- No upstream table holds a player position, a frame or an off-ball action.
+  The nearest, `athlete.performance_stat`, is a per-match number Hudl already
+  owns.
+
+So it is modeled on the source side only, flagged `source_only=True` in
+`SYSTEMS`. That changes one rule. The test that every system owns at least one
+target table — which exists to catch a system the ownership review forgot —
+now reads **every named system owns something, and no source-only system
+does** (`test_every_named_system_owns_something`). Relaxing it was the honest
+option: giving `tracking` a target table would mean re-modeling the target,
+which this project never does, and assigning it an existing table would claim
+a feed that does not exist.
+
+What it costs downstream is recorded with the other losses in
+[04-physical-model-target.md](04-physical-model-target.md#what-the-target-cannot-represent):
+everything `tracking` holds is invisible to the lakehouse.
 
 ## How ownership was assigned
 
@@ -75,7 +107,7 @@ explaining what is missing, and a test enforces that.
 
 ## What makes each system distinctive
 
-The reason for modelling ten schemas rather than one is that their idioms
+The reason for modelling eleven schemas rather than one is that their idioms
 genuinely differ. Each entry below is the thing worth seeing in that schema.
 
 ### sap_s4 — SAP S/4HANA
@@ -237,6 +269,25 @@ what earns it a place.
 - **Time is a dimension member, not a date.** "FY26 Q3" need not align with a
   calendar quarter.
 
+### tracking — Football player tracking (source-only)
+
+- **The frame is the native unit.** `player_frame_position` is about three
+  million rows per match (22 players at 25 frames a second over 90 minutes),
+  partitioned monthly like `tm_axs.scan`.
+- **Coordinates are the vendor's, not the pitch's.** Metres or centimetres
+  from the centre spot, and teams change ends at half time. `capture` holds
+  the unit and origin, `capture_period` the direction of play, `match` the
+  pitch size; nothing is normalised at rest.
+- **Players are shirt numbers on a side.** A raw feed says "home 9".
+  `match_squad` turns that into a player for one match only.
+- **Captures are versioned.** A vendor re-delivers a match after correcting
+  player identity. Old frames are kept; only the current primary capture is
+  read.
+- **Off-ball is defined by the ball carrier.** `frame.ball_carrier_player_id`
+  names who has the ball; every other player in that frame is off it.
+  `off_ball_action.led_to_hudl_instance_id` links a run to the Hudl instance —
+  the shot — it created.
+
 ## Extract patterns
 
 | Pattern | Systems | How it works |
@@ -246,12 +297,14 @@ what earns it a place.
 | Event stream + API | `adobe_aep` | Events stream continuously; profile and segment state polled. |
 | Webhooks + sweep | `shopify` | Webhooks for latency, a reconciling `updated_at` sweep because delivery is at-least-once, not guaranteed. |
 | API snapshot | `workday_ap` | Whole version at once. A cube does not have a sensible incremental read. |
+| File per match | `tracking` | One delivered file per match capture, found by `capture.delivered_at`. A re-delivery is a new capture version, not an update. |
 
 Detail in [07-integration-contract.md](07-integration-contract.md).
 
-## Adding an eleventh system
+## Adding another system
 
-The boundary is deliberately easy to move. To bring, say, a sportsbook in:
+`tracking` was added this way as the eleventh. The boundary is deliberately
+easy to move. To bring, say, a sportsbook in:
 
 1. Add it to `SYSTEMS` in [tools/scope.py](../tools/scope.py).
 2. Remove `gaming` from `OUT_OF_SCOPE` in the same file.
@@ -259,8 +312,17 @@ The boundary is deliberately easy to move. To bring, say, a sportsbook in:
 4. Add the `gaming` block to `OWNERSHIP` in
    [tools/ownership.py](../tools/ownership.py).
 5. Add a `SchemaConfig` to [tools/gen_audit.py](../tools/gen_audit.py).
-6. Run `uv run offball-extract && uv run offball-mapping && uv run
-   offball-audit && uv run offball-check && uv run pytest`.
+6. Add the schema to every load list: `models/physical/sql/00_create_all.sql`,
+   `tools/load.sh` and `SCHEMA_ORDER` in `tests/conftest.py`, and its idiom
+   points to `IDIOM` in [tools/gen_schema_readme.py](../tools/gen_schema_readme.py).
+7. Run `uv run offball-extract && uv run offball-common && uv run
+   offball-mapping && uv run offball-audit && uv run offball-schema-readme &&
+   uv run offball-check && uv run pytest`, then regenerate the dictionary
+   with `uv run offball-dictionary` against a loaded database.
+
+For a **source-only** system like `tracking`, set `source_only=True` in
+`SYSTEMS` and skip steps 2 and 4: there is nothing to bring into scope and
+nothing to own.
 
 `offball-check` will refuse to pass until the mapping names only tables that
 actually exist in the new DDL, which is the point.

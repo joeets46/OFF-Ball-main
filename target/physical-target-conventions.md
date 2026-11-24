@@ -36,12 +36,12 @@ treats it as binding anyway.
 | # | Target property | What the source must provide | Where |
 |--:|---|---|---|
 | 1 | Uniform `BIGINT` `_id` keys | A mapping from every system-local key to a canonical surrogate | `common.entity_xref`, `common.canonical_entity` |
-| 2 | Constraints are informational, not enforced | Real enforcement, since the target will not catch anything | 341 PKs, 504 FKs, 925 CHECKs, 150 UNIQUEs |
+| 2 | Constraints are informational, not enforced | Real enforcement, since the target will not catch anything | 304 PKs, 546 FKs, 973 CHECKs, 107 UNIQUEs |
 | 3 | 1,477 cross-domain FKs | Business-key columns plus resolution, because these cross databases | Unenforced `*_code` / `*_id` columns; no FK crosses a schema |
-| 4 | `source_system_code` per table | A registry of all ten systems — the target enum names only five | `common.source_system` |
+| 4 | `source_system_code` per table | A registry of all eleven systems — the target enum names only five | `common.source_system` |
 | 5 | `created_timestamp` / `updated_timestamp` | A watermark maintained by trigger, not by application code | `common.touch_updated_at()`, per-schema variants |
 | 6 | No tombstone mechanism | A change log, so deletes are observable | `<schema>._change_log` |
-| 7 | `TIMESTAMP` with offset | `TIMESTAMPTZ` throughout; never a naive timestamp | All ten schemas |
+| 7 | `TIMESTAMP` with offset | `TIMESTAMPTZ` throughout; never a naive timestamp | All eleven schemas |
 | 8 | Value domains as bare `STRING` | The enumerations restored as reference tables or CHECKs | 43 reference tables, 619 CHECKs, 55 DOMAIN types |
 | 9 | 4 classification levels | Columns classified, and PII separated where the platform allows | 3 PII satellites, 3 roles with differing grants |
 | 10 | Denormalized, 6 associative tables | The many-to-many relationships restored | 32 associative entities in the logical model |

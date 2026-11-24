@@ -7,6 +7,10 @@ models exactly the ten operational systems the upstream model names as its own
 systems of record, and the parts of the target model that no named system can
 plausibly source are out of scope rather than invented.
 
+The source-only `tracking` system does not move this boundary. It owns no
+target table and brings none of the 47 into scope; see
+[05-source-systems.md](05-source-systems.md#the-source-only-system-tracking).
+
 The complete register is [mapping/out_of_scope.csv](../mapping/out_of_scope.csv),
 which carries every excluded table with its reason and the class of system that
 would bring it in. `offball-check` and `tests/test_mapping_coverage.py` both

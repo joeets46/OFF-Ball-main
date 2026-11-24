@@ -61,7 +61,7 @@ services:
       timeout: 5s
       retries: 20
       start_period: 10s
-    # The model is index-heavy (1,431 indexes) and the load is one long
+    # The model is index-heavy (1,328 indexes) and the load is one long
     # transaction-per-statement stream, so a little more working memory makes
     # a visible difference on a full rebuild.
     command:

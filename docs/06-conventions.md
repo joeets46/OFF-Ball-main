@@ -1,14 +1,14 @@
 # Conventions
 
 The rules the DDL follows, and why. Decided before the schemas were written,
-which is why they are consistent across 255 tables.
+which is why they are consistent across 267 tables.
 
 ## The one that surprises people
 
 **Each schema uses its own system's idiom, not a house style.**
 
 A house style would be easier to read and would be a lie. The whole point of
-modelling ten systems separately is that their keys, their types and their
+modelling eleven systems separately is that their keys, their types and their
 timestamp semantics genuinely differ, and that those differences are the
 integration work. Flattening them would hide exactly what this model exists to
 show.
@@ -25,6 +25,7 @@ show.
 | `dalet` | `VARCHAR(40)` MAM IDs | `updated_at` | Rare |
 | `sap_sfsf` | `VARCHAR` MDF keys, effective-dated composites | `last_modified_on` | Rare |
 | `workday_ap` | `VARCHAR` model-scoped codes | `updated_at` | Routine for cells |
+| `tracking` | `BIGINT`, **vendor-assigned** for match and player | `updated_at`, but frames are read per capture via `delivered_at` | Off-ball actions really deleted when the detection model re-runs |
 
 Three of those are worth dwelling on:
 
@@ -197,7 +198,8 @@ as truthful, and an application-maintained timestamp is missed on exactly the
 Append-only tables carry no watermark and take no trigger, which is stated in a
 comment so the absence reads as deliberate: `tm_axs.scan`,
 `tm_axs.screening_event`, `tm_axs.payment_transaction`,
-`adobe_aep.experience_event`, `adobe_aep.journey_step_event`.
+`adobe_aep.experience_event`, `adobe_aep.journey_step_event`,
+`tracking.frame`, `tracking.player_frame_position`.
 
 Each schema has a `_change_log` table and a generic trigger function.
 **Deletes are why it exists**: a high-water-mark read of the watermark cannot
@@ -303,6 +305,7 @@ Five tables, all by `RANGE` on an event timestamp:
 | `tm_axs.screening_event` | half-yearly | Same burst profile, lower volume |
 | `adobe_aep.experience_event` | quarterly | Every page view, app open and stream start |
 | `adobe_aep.journey_step_event` | half-yearly | Every message sent or suppressed |
+| `tracking.player_frame_position` | monthly | Every player 25 times a second, about three million rows per match |
 
 Each has a `DEFAULT` partition, and each default carries a comment saying it
 should stay empty — rows landing there mean partition maintenance has fallen

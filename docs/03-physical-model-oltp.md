@@ -1,7 +1,7 @@
 # Physical model — the source OLTP tier
 
-Ten PostgreSQL 18 schemas, one per named system of record. **255 base tables
-plus 24 partitions.**
+Eleven PostgreSQL 18 schemas: one per system of record the upstream model
+names, plus the source-only `tracking`. **267 base tables plus 37 partitions.**
 
 The DDL is in [../models/physical/](../models/physical/), and the conventions it follows are in
 [06-conventions.md](06-conventions.md).
@@ -20,19 +20,21 @@ The DDL is in [../models/physical/](../models/physical/), and the conventions it
 | `adobe_aep` | Adobe Experience Platform | A | 21 | 8 |
 | `sap_sfsf` | SAP SuccessFactors | B | 19 | 0 |
 | `workday_ap` | Workday Adaptive Planning | B | 12 | 0 |
+| `tracking` | Football player tracking (source-only) | A | 12 | 13 |
 | `common` | shared domains and identity resolution | — | 3 | 0 |
 
-Object totals, read from the loaded database:
+Object totals, read from `pg_catalog` after a fresh load of `00_create_all.sql`.
+Constraints and indexes include the copies PostgreSQL creates on each partition:
 
 | | Count |
 |---|--:|
-| Primary keys | 341 |
-| Foreign keys | 504 |
-| CHECK constraints | 925 |
-| Unique constraints | 150 |
+| Primary keys | 304 |
+| Foreign keys | 546 |
+| CHECK constraints | 973 |
+| Unique constraints | 107 |
 | Shared `DOMAIN` types | 55 |
-| Indexes | 1,431 |
-| Triggers | 308 |
+| Indexes | 1,328 |
+| Triggers | 319 |
 
 ## The defining decision
 
@@ -107,7 +109,7 @@ misrepresent them; grants restrict the tables instead.
 
 ## Partitioning
 
-Four tables, all `RANGE` on an event timestamp, all with a `DEFAULT` partition
+Five tables, all `RANGE` on an event timestamp, all with a `DEFAULT` partition
 that should stay empty:
 
 | Table | Grain | Why |
@@ -116,6 +118,7 @@ that should stay empty:
 | `tm_axs.screening_event` | half-yearly | Same profile, lower volume |
 | `adobe_aep.experience_event` | quarterly | Every page view, app open, stream start |
 | `adobe_aep.journey_step_event` | half-yearly | Every message sent or suppressed |
+| `tracking.player_frame_position` | monthly | Every player 25 times a second: about three million rows per match |
 
 The primary key includes the partition key, which PostgreSQL requires — hence
 `scan` keyed `(scan_id, scanned_at)` rather than on the surrogate alone.
@@ -130,13 +133,13 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f models/physical/sql/00_create_all.sql
 Or, with no local `psql`, through the container:
 
 ```bash
-bash tools/load.sh            # all ten schemas
+bash tools/load.sh            # all eleven schemas
 bash tools/load.sh tm_axs     # just one
 ```
 
 The numbered file layout means a single forward pass works without deferred
 constraints or a dependency sort: `50_constraints.sql` runs after every table
-in the schema exists. The ten schemas are mutually independent and can load in
+in the schema exists. The eleven schemas are mutually independent and can load in
 any order.
 
 ## Verifying it
@@ -145,7 +148,7 @@ any order.
 uv run pytest
 ```
 
-30 tests. The ones that matter most:
+37 tests. The ones that matter most:
 
 - every DDL file loads into a clean database with no errors
 - every base table has a primary key

@@ -28,8 +28,8 @@ Registered in `common.canonical_entity`:
 |---|---|
 | `fan` | `sfdc_crm.contact`, `tm_axs.customer_account`, `shopify.customer`, `adobe_aep.profile`, `archtics.sta_account` |
 | `venue` | `archtics.building`, `tm_axs.venue_ref`, `sap_s4.t001w` |
-| `fixture` | `tm_axs.event`, `archtics.event_manifest`, `hudl.game` |
-| `athlete` | `sap_sfsf.per_person`, `hudl.player` |
+| `fixture` | `tm_axs.event`, `archtics.event_manifest`, `hudl.game`, `tracking.match` |
+| `athlete` | `sap_sfsf.per_person`, `hudl.player`, `tracking.player` |
 | `franchise` | `sap_s4.t001`, `sap_s4.cepc`, `sfdc_crm.account`, `hudl.team` |
 | `sponsor` | `sfdc_crm.account`, `sap_s4.kna1` |
 | `supplier` | `sap_s4.lfa1`, `shopify.sales_order.vendor` |
@@ -78,6 +78,7 @@ four different ways:
 | `shopify` | Rare; lifecycle timestamps instead (`cancelled_at`, `archived`) | Read the timestamps |
 | `workday_ap` | Routine for cells, as planners clear rows | Snapshot per version sidesteps it |
 | `adobe_aep`, `tm_axs`, `archtics`, `dalet` | Soft, via status | Read the status |
+| `tracking` | Off-ball actions really deleted when the detection model re-runs; a re-delivered capture supersedes the old one without deleting it | `_change_log` for actions; filter `capture.is_current` |
 
 `sap_s4.bsid`/`bsik` are the case that justifies the whole mechanism. They are
 index tables whose key *encodes* the clearing state, and a row vanishes the
@@ -99,6 +100,7 @@ about it, and the distinction is load-bearing:
 | `tm_axs.scan` | `scanned_at` | `uploaded_at` | Gate readers buffer when the network drops, then backfill |
 | `adobe_aep.experience_event` | `timestamp` | `received_at` | Mobile SDKs buffer offline, sometimes for days |
 | `adobe_aep.journey_step_event` | `occurred_at` | `created_at` | Delivery receipts arrive asynchronously |
+| `tracking.frame` | `captured_at` | `capture.delivered_at` | The vendor delivers the whole match as a file hours after full time, and may deliver it again |
 
 **The watermark must be the arrival column.** Occurrence time is not monotonic,
 so an extract keyed on it loses every late event permanently — and at a gate,
@@ -109,7 +111,8 @@ late events cluster exactly where attendance reconciliation needs them.
 
 Both tables carry a `CHECK` that arrival is not before occurrence, which
 catches clock skew on the reader rather than letting it silently reorder the
-stream.
+stream. `tracking` cannot: occurrence is on the frame and arrival on the
+capture, and no `CHECK` sees across tables.
 
 ## 4. Watermark semantics per system
 
@@ -118,10 +121,11 @@ where only one works.
 
 | System | Column | Note |
 |---|---|---|
-| `sap_s4`, `tm_axs`, `archtics`, `dalet`, `shopify`, `hudl`, `workday_ap` | `updated_at` | Maintained by `common.touch_updated_at()` |
+| `sap_s4`, `tm_axs`, `archtics`, `dalet`, `shopify`, `hudl`, `workday_ap`, `tracking` | `updated_at` | Maintained by `common.touch_updated_at()` |
 | `sfdc_crm` | `system_modstamp` | **Not `last_modified_date`** |
 | `sap_sfsf` | `last_modified_on` | |
 | `adobe_aep` events | `received_at` | Arrival, per §3 |
+| `tracking` frames and positions | `capture.delivered_at` | No watermark of their own: read a whole capture at a time |
 
 The Salesforce case is the trap. `SystemModstamp` moves on platform-driven
 changes that leave `LastModifiedDate` untouched — a workflow rule firing, a
@@ -177,6 +181,7 @@ payroll posting becomes 400 target rows repeating the header 400 times.
 | Event stream + API | `adobe_aep` | Events stream, state polled | Watermark on arrival, not occurrence |
 | Webhooks + sweep | `shopify` | Webhooks for latency | Delivery is at-least-once, not guaranteed; the `updated_at` sweep is the safety net |
 | API snapshot | `workday_ap` | Whole version at once | Filter `is_plan_of_record`, exclude `is_calculated` cells |
+| File per match | `tracking` | Read each newly delivered capture whole | Filter `is_current AND is_primary`; normalise coordinates before any zone test |
 
 ### The traps worth naming
 
@@ -203,13 +208,46 @@ payroll posting becomes 400 target rows repeating the header 400 times.
 - **Adaptive sign flips and rollups.** `account.is_sign_flipped` must be
   honoured, and `level.is_rollup_only` rows must be excluded or totals double.
 
+### Tracking traps: pitch coordinates and frame rate
+
+`tracking` stores positions exactly as the vendor delivers them. Every one of
+these has to be handled before a position means anything:
+
+- **Unit.** `capture.coordinate_unit` is `m` or `cm`. Mixing captures in
+  different units puts a player 100 times too far away.
+- **Origin.** With `coordinate_origin = 'centre'`, (0, 0) is the centre spot
+  and half of all coordinates are negative. Normalising to the 0..100 pitch
+  that `pitch_zone` uses is `x_norm = (x / L + 0.5) * 100` and
+  `y_norm = (y / W + 0.5) * 100`, in metres.
+- **Pitch size.** `L` and `W` are `match.pitch_length_m` and `pitch_width_m`,
+  and they vary by venue (Law 1 allows 90–120 m by 45–90 m). Normalising every
+  match with a default 105 × 68 m misplaces the penalty box on a smaller pitch.
+- **Direction of play.** Teams change ends at half time.
+  `capture_period.home_attacks_positive_x` says which way each side attacks in
+  each period. To make a team always attack towards x = 100, rotate its
+  positions 180° when it attacks negative x — flip both `x` and `y`. Flipping
+  `x` alone swaps the left and right wings.
+- **Frame rate.** `capture.frames_per_second` is 25 for optical and often 10
+  for GPS. Time is `frame_number / frames_per_second`, and speed and distance
+  come from the gap between frames, so assuming 25 Hz on a 10 Hz capture makes
+  everyone run 2.5 times too fast.
+- **Period clock.** `frame.period_clock_ms` restarts at zero each period. The
+  match clock reads 46:00 at 60,000 ms into period 2, and stoppage time
+  pushes period 1 past 2,700,000 ms. Never add periods together as if they
+  were one clock.
+- **Shirt numbers.** Raw frames identify a player as a side and a shirt
+  number. Resolve them through `match_squad` for that match only; numbers are
+  reissued between seasons.
+- **Re-delivery.** Superseded captures keep their frames. Without
+  `is_current AND is_primary`, every run and every metre is counted twice.
+
 ## Ordering
 
 Dependencies that cannot be reordered:
 
 ```
 1. common.source_system, common.canonical_entity     (registries)
-2. Source extracts, all ten systems                  (independent, parallel)
+2. Source extracts, all eleven systems               (independent, parallel)
 3. common.entity_xref                                (resolve identity)
 4. Target master tables                              (need canonical keys)
 5. Target transactional tables                       (need master)
@@ -254,6 +292,10 @@ What to check before promoting a load, in rough order of value:
 | Consent | No marketing load for `consent_state <> 'allow'` | A compliance gate, not a quality one |
 | PII routing | PII satellites only to permitted targets | The satellite split is pointless if the pipeline rejoins it everywhere |
 | Default partitions | `*_default` partitions empty | Rows there mean partition maintenance has fallen behind |
+| Tracking capture | One current primary capture per match | Otherwise a re-delivery or a GPS capture double-counts every run |
+| Tracking frame count | Frames ≈ `frames_per_second` × seconds played | A wrong frame rate shows up here before it distorts every speed |
+| Tracking players per frame | At most 11 per side | More means a substitute's shirt number was not resolved through `match_squad` |
+| Tracking coordinates | Normalised positions within 0..100, with a small margin | Values far outside mean the unit, origin or direction was applied wrongly |
 
 The last one is cheap and catches a slow failure: a default partition filling
 up means nobody created next month's partitions.
