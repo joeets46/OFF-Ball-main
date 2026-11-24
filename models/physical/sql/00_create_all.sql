@@ -24,7 +24,7 @@
 --
 -- The schemas themselves are independent: no schema references another, by
 -- design. Cross-system references are business keys resolved through
--- common.entity_xref, so the ten systems can be loaded in any order.
+-- common.entity_xref, so the eleven systems can be loaded in any order.
 -- =========================================================================
 
 \set ON_ERROR_STOP on
@@ -131,6 +131,16 @@
 \ir ../workday_ap/ddl/60_indexes.sql
 \ir ../workday_ap/ddl/70_audit.sql
 \ir ../workday_ap/ddl/80_comments.sql
+
+\echo '==> tracking (Football player tracking, source-only)'
+\ir ../tracking/ddl/00_schema.sql
+\ir ../tracking/ddl/20_reference.sql
+\ir ../tracking/ddl/30_master.sql
+\ir ../tracking/ddl/40_transaction.sql
+\ir ../tracking/ddl/50_constraints.sql
+\ir ../tracking/ddl/60_indexes.sql
+\ir ../tracking/ddl/70_audit.sql
+\ir ../tracking/ddl/80_comments.sql
 
 \echo ''
 \echo '==> load complete. Object counts:'

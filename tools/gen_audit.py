@@ -230,6 +230,29 @@ CONFIG: dict[str, SchemaConfig] = {
         pii_tables=(),
         append_only=("instance_label", "playlist_instance"),
     ),
+    "tracking": SchemaConfig(
+        system_name="Football player tracking (optical / GPS)",
+        description=(
+            "Football player tracking (optical / GPS) -- frame-by-frame positions "
+            "of every player and the ball, and the off-ball actions derived from "
+            "them. Source-only: owns no upstream target table. Extract pattern: "
+            "file per match, keyed on capture.delivered_at."
+        ),
+        # Off-ball actions really are deleted: re-running the detection model
+        # replaces the model's actions for a match. Frames and positions are
+        # never updated in place -- a re-delivery is a new capture -- so a
+        # change log over them would only double the largest table.
+        cdc_tables={
+            "match": "match_id",
+            "player": "player_id",
+            "capture": "capture_id",
+            "off_ball_action": "off_ball_action_id",
+        },
+        # Display names only; the identity record is sap_sfsf.per_person.
+        pii_tables=(),
+        append_only=("frame", "player_frame_position", "capture_period",
+                     "off_ball_action_zone"),
+    ),
     "dalet": SchemaConfig(
         system_name="Dalet Galaxy",
         description=(

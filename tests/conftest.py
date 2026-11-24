@@ -33,11 +33,11 @@ FILE_ORDER = (
     "80_comments.sql",
 )
 
-#: `common` first, then the ten systems. The systems are mutually independent
+#: `common` first, then the eleven systems. The systems are mutually independent
 #: by design, so their relative order does not matter.
 SCHEMA_ORDER = (
     "sap_s4", "tm_axs", "archtics", "sfdc_crm", "shopify",
-    "adobe_aep", "hudl", "dalet", "sap_sfsf", "workday_ap",
+    "adobe_aep", "hudl", "dalet", "sap_sfsf", "workday_ap", "tracking",
 )
 
 

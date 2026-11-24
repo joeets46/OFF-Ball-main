@@ -22,7 +22,7 @@ def test_all_ddl_files_load_without_error(loaded_db):
 
 
 def test_every_schema_exists(loaded_db):
-    """All ten system schemas plus `common` are present after the load."""
+    """All eleven system schemas plus `common` are present after the load."""
     with loaded_db.cursor() as cur:
         cur.execute(
             """

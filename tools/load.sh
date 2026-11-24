@@ -46,9 +46,9 @@ FILE_ORDER=(00_schema 10_domains_and_enums 20_reference 30_master 31_master_pii 
 if [ $# -gt 0 ]; then
     SCHEMAS=("$@")
 else
-    # The ten systems are mutually independent by design, so this order is for
+    # The eleven systems are mutually independent by design, so this order is for
     # readability rather than dependency.
-    SCHEMAS=(sap_s4 tm_axs archtics sfdc_crm shopify adobe_aep hudl dalet sap_sfsf workday_ap)
+    SCHEMAS=(sap_s4 tm_axs archtics sfdc_crm shopify adobe_aep hudl dalet sap_sfsf workday_ap tracking)
 fi
 
 echo "==> resetting database $DB"
