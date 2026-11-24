@@ -81,6 +81,4 @@ def redeliver(sink, world: World, match: Match) -> int:
 def rerun_detection(sink, world: World, match: Match, model_version: str) -> tuple[int, int]:
     """Replace the model's actions for ``match``. Returns (deleted, inserted)."""
     rows = detect(world, match, plant(world, match), model_version, include_analyst=False)
-    deleted = sink.delete_model_actions(match.match_id)
-    inserted = sink.write_actions(match.match_id, rows)
-    return deleted, inserted
+    return sink.replace_model_actions(match.match_id, rows)

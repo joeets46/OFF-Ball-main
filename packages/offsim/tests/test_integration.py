@@ -177,6 +177,25 @@ def test_model_rerun_really_deletes(sim):
                   f"match_id = {match.match_id} AND detection_model_version = 'offsim-detect-1.0'") == 0
 
 
+def test_failed_model_rerun_keeps_the_old_actions(sim, monkeypatch):
+    """Delete and insert are one transaction: a failed insert deletes nothing."""
+    conn, world, sink, _ = sim
+    match = world.matches[1]
+    model = f"match_id = {match.match_id} AND detection_method = 'model'"
+    before = _count(conn, "off_ball_action", model)
+    logged_before = change_log_summary(conn).get("off_ball_action", 0)
+
+    def fail(*args):
+        raise RuntimeError("insert failed")
+
+    monkeypatch.setattr(sink, "write_actions", fail)
+    with pytest.raises(RuntimeError):
+        rerun_detection(sink, world, match, "offsim-detect-2.0")
+    assert before > 0
+    assert _count(conn, "off_ball_action", model) == before
+    assert change_log_summary(conn).get("off_ball_action", 0) == logged_before
+
+
 def test_stream_keeps_every_check_passing(sim, make_world, tiny):
     conn, _, sink, _ = sim
     season = make_world(dataclasses.replace(tiny, matches=12))

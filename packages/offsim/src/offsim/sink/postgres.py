@@ -134,6 +134,13 @@ class PostgresSink:
                         "WHERE match_id = %s AND detection_method = 'model'", [match_id])
             return cur.rowcount
 
+    def replace_model_actions(self, match_id: int, rows: Iterable[dict]) -> tuple[int, int]:
+        """Delete the model's actions and insert ``rows`` in one transaction, so a
+        failed insert leaves the old actions. Returns (deleted, inserted)."""
+        with self.conn.transaction():
+            deleted = self.delete_model_actions(match_id)
+            return deleted, self.write_actions(match_id, rows)
+
     # -- capture versions ---------------------------------------------------
 
     def max_delivery_version(self, match_id: int) -> int:
