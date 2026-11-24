@@ -266,6 +266,31 @@ tm_axs,ticket,table,,18,4,5,7,The issued entitlement. Seat labels are copied on 
 tm_axs,ticket_inventory,table,,15,2,1,5,The selling system mirror of the Archtics manifest. Drifts from archtics.event_manifest during an on-sale; Archtics is authoritative.
 tm_axs,ticket_transfer,table,,11,3,3,4,"Ticket transfers between accounts. Offered to an email address before a recipient account necessarily exists, which is why the recipient is nullable."
 tm_axs,venue_ref,table,,13,0,1,2,"The venue as TM/AXS holds it. Deliberately a separate record from archtics.building and sap_s4.t001w: all three describe the same building and none shares a key, which is the clearest illustration of why the target venue_id is a product of integration."
+tracking,_change_log,table,,7,0,1,3,Change capture for incremental extraction. Deletes are the reason this exists: a high-water-mark read of updated_at cannot see a removed row.
+tracking,capture,table,,12,1,5,4,"One delivered recording of one match, with its frame rate and coordinate system. Versioned, because vendors re-deliver after fixing player identity."
+tracking,capture_period,table,,6,1,3,1,"Frame range and direction of play per period. Teams change ends at half time, so without this every second-half x coordinate is mirrored."
+tracking,frame,table,,13,2,8,3,"One instant of a capture: where the ball is and who has it. Append-only, about 135,000 rows per match."
+tracking,match,table,,10,0,3,4,"The tracking vendor's record of a fixture, and the only place the pitch size lives. The same fixture exists as hudl.game and tm_axs.event."
+tracking,match_squad,table,,8,2,2,4,"Which shirt number each player wore on which side in one match. Raw frames say ""home 9""; this is what makes that a person."
+tracking,off_ball_action,table,,12,5,5,6,"A movement by a player without the ball, detected by a model or coded by an analyst, optionally linked to the Hudl instance it led to. No upstream equivalent."
+tracking,off_ball_action_type,table,,6,0,1,2,"Kinds of off-ball action, each in or out of possession: a run in behind, a decoy run, a press, a mark."
+tracking,off_ball_action_zone,table,,4,3,0,2,The pitch zones an off-ball action passed through. Associative: a run starts in one zone and ends in another.
+tracking,pitch_zone,table,,9,0,6,2,"Named areas of a normalised 0..100 pitch -- thirds, the box, the half-spaces. What makes space something a query can ask about."
+tracking,player,table,,6,0,0,4,"The athlete as the tracking vendor knows them: a third record of the same person, after sap_sfsf.per_person and hudl.player."
+tracking,player_frame_position,partitioned,,7,2,1,2,"Where every player is, 25 times a second. About three million rows per match. Monthly range partitions: queried per match, and retention is a DETACH."
+tracking,player_frame_position_2026_01,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_02,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_03,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_04,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_05,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_06,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_07,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_08,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_09,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_10,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_11,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_2026_12,partition,player_frame_position,7,2,1,2,
+tracking,player_frame_position_default,partition,player_frame_position,7,2,1,2,Catch-all. Rows landing here mean the partition maintenance job has fallen behind; it should be monitored and stay empty.
 workday_ap,_change_log,table,,7,0,1,3,Change capture for incremental extraction. Deletes are the reason this exists: a high-water-mark read of updated_at cannot see a removed row.
 workday_ap,account,table,,12,2,3,7,The planning chart of accounts. The sign-flip flag prevents the commonest FP&A integration error: revenue is stored negative in many Adaptive models.
 workday_ap,allocation_rule,table,,10,4,2,5,"How a cost pool is split across levels: evenly, by a driver, or by fixed percentages. No target counterpart, so an allocated figure arrives unexplained."

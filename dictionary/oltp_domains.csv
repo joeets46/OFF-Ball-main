@@ -18,7 +18,7 @@ dom_document_number_range,character varying(2),yes,CHECK (((VALUE)::text ~ '^[A-
 dom_email,text,yes,"CHECK ((VALUE ~ '^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'::text))",13,"Pattern ^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$ -- 10 columns in 10 target tables."
 dom_exclusivity_territory,text,yes,"CHECK ((VALUE ~ '^[A-Z]{3}(,[A-Z]{3})*$'::text))",0,"Pattern ^[A-Z]{3}(,[A-Z]{3})*$ -- 2 columns in 2 target tables."
 dom_feature_code,character varying(20),yes,"CHECK (((VALUE)::text ~ '^[A-Z0-9\-]{3,20}$'::text))",0,"Pattern ^[A-Z0-9\-]{3,20}$ -- 3 columns in 3 target tables."
-dom_fixture_code,character varying(30),yes,"CHECK (((VALUE)::text ~ '^[A-Z0-9_-]{3,30}$'::text))",2,"Pattern ^[A-Z0-9_-]{3,30}$ -- 6 columns in 6 target tables."
+dom_fixture_code,character varying(30),yes,"CHECK (((VALUE)::text ~ '^[A-Z0-9_-]{3,30}$'::text))",3,"Pattern ^[A-Z0-9_-]{3,30}$ -- 6 columns in 6 target tables."
 dom_floor_plan_version,text,yes,CHECK ((VALUE ~ '^v[0-9]+\.[0-9]+$'::text)),0,Pattern ^v[0-9]+\.[0-9]+$ -- 2 columns in 2 target tables.
 dom_hierarchy_node_code,character varying(20),yes,"CHECK (((VALUE)::text ~ '^[A-Z0-9_-]{1,20}$'::text))",0,"Pattern ^[A-Z0-9_-]{1,20}$ -- 2 columns in 1 target tables."
 dom_hvac_zone_code,character varying(15),yes,"CHECK (((VALUE)::text ~ '^[A-Z0-9\-]{1,15}$'::text))",0,"Pattern ^[A-Z0-9\-]{1,15}$ -- 3 columns in 2 target tables."

@@ -9,13 +9,13 @@ columns are generated, and which constraints actually took effect.
 
 | File | Rows | What it holds |
 |---|--:|---|
-| `oltp_tables.csv` | 279 | Every table and partition, with column and constraint counts |
-| `oltp_columns.csv` | 3133 | Every column of every base table |
-| `oltp_constraints.csv` | 3758 | Primary keys, foreign keys, unique and check constraints with definitions |
+| `oltp_tables.csv` | 304 | Every table and partition, with column and constraint counts |
+| `oltp_columns.csv` | 3233 | Every column of every base table |
+| `oltp_constraints.csv` | 3909 | Primary keys, foreign keys, unique and check constraints with definitions |
 | `oltp_domains.csv` | 55 | Shared scalar types and the pattern each enforces |
 
-Coverage: 255/255 base tables carry a description,
-and 87 columns do. Column descriptions are deliberately
+Coverage: 267/267 base tables carry a description,
+and 93 columns do. Column descriptions are deliberately
 selective -- they explain the columns where the *reason* for the design is not
 obvious from the name, rather than restating every name as a sentence.
 

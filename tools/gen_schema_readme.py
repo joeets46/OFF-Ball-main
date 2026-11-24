@@ -139,6 +139,20 @@ IDIOM: dict[str, list[str]] = {
         "in many Adaptive models, and missing the flip inverts the P&L.",
         "**Tier B**: abbreviated depth by design.",
     ],
+    "tracking": [
+        "**The frame is the native unit.** Every player and the ball, 25 times "
+        "a second: `player_frame_position` is about three million rows per "
+        "match, partitioned monthly like `tm_axs.scan`.",
+        "**Coordinates are the vendor's.** Metres or centimetres from the "
+        "centre spot, with the direction of play flipping at half time. "
+        "`capture` and `capture_period` carry what normalising needs.",
+        "**Players are shirt numbers on a side.** A raw feed says \"home 9\"; "
+        "`match_squad` turns that into a player for one match.",
+        "**Captures are versioned.** A vendor re-delivers a match after fixing "
+        "player identity, so only the current primary capture is read.",
+        "**`frame.ball_carrier_player_id` is what off-ball means**: every other "
+        "player in the frame is off the ball.",
+    ],
 }
 
 FILE_PURPOSE: dict[str, str] = {
@@ -180,9 +194,14 @@ def main(argv: list[str] | None = None) -> int:
           + (f" plus {len(info.partitions)} partitions" if info.partitions else "")
           + f", owning **{len(owned)}** of the 153 in-scope target tables.")
         w("")
-        w("Named in the upstream model's `operational_systems_of_records`. See")
-        w("[../../../docs/05-source-systems.md](../../../docs/05-source-systems.md) for how")
-        w("ownership was assigned.")
+        if system.source_only:
+            w("**Source-only.** Not named in the upstream model, and it owns no target")
+            w("table by design: no upstream table holds what this system records. See")
+            w("[../../../docs/05-source-systems.md](../../../docs/05-source-systems.md).")
+        else:
+            w("Named in the upstream model's `operational_systems_of_records`. See")
+            w("[../../../docs/05-source-systems.md](../../../docs/05-source-systems.md) for how")
+            w("ownership was assigned.")
         w("")
 
         w("## Native idiom modeled here")
@@ -193,11 +212,14 @@ def main(argv: list[str] | None = None) -> int:
 
         w("## Target tables it owns")
         w("")
-        w("| Target table | Source tables | Transform | Confidence |")
-        w("|---|---|---|:--:|")
-        for r in owned:
-            src = ", ".join(f"`{t}`" for t in r.src)
-            w(f"| `{r.domain}.{r.table}` | {src} | `{r.transform}` | {r.confidence} |")
+        if owned:
+            w("| Target table | Source tables | Transform | Confidence |")
+            w("|---|---|---|:--:|")
+            for r in owned:
+                src = ", ".join(f"`{t}`" for t in r.src)
+                w(f"| `{r.domain}.{r.table}` | {src} | `{r.transform}` | {r.confidence} |")
+        else:
+            w("None. Everything here is source-tier data the target model cannot represent.")
         w("")
 
         low = [r for r in owned if r.confidence == "low"]
