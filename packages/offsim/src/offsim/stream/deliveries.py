@@ -54,20 +54,33 @@ def next_event(world: World, sink, tick_key: tuple) -> Event:
     if not done:
         return Event("idle", None, "nothing delivered yet and nothing pending")
 
+    if roll >= 0.75:
+        # Only matches a newer model can still run on: an event that changes
+        # nothing leaves the same state, which draws the same event every tick.
+        candidates = [m for m in done if _next_model(sink, m.match_id)]
+        if candidates:
+            match = r.choice(candidates)
+            model = _next_model(sink, match.match_id)
+            deleted, inserted = rerun_detection(sink, world, match, model)
+            if deleted or inserted:
+                return Event("redetect", match.match_id,
+                             f"{model}: {deleted} model actions deleted, {inserted} inserted")
+            # No model rows before or after, so nothing changed: redeliver instead.
     match = r.choice(done)
-    if roll < 0.75:
-        version = redeliver(sink, world, match)
-        return Event("redeliver", match.match_id, f"now delivery_version {version}")
-    # Only ever forwards: a re-run deletes the older version's rows, so "not
-    # used yet" would include versions already replaced.
-    used = sink.model_versions(match.match_id)
+    version = redeliver(sink, world, match)
+    return Event("redeliver", match.match_id, f"now delivery_version {version}")
+
+
+def _next_model(sink, match_id: int) -> str | None:
+    """The next detection model for a match; None when it is on the newest.
+
+    Only ever forwards: a re-run deletes the older version's rows, so "not
+    used yet" would include versions already replaced.
+    """
+    used = sink.model_versions(match_id)
     latest = max((MODEL_VERSIONS.index(v) for v in used), default=0)
-    newer = list(MODEL_VERSIONS[latest + 1:])
-    if not newer:
-        return Event("idle", match.match_id, "already on the newest detection model")
-    deleted, inserted = rerun_detection(sink, world, match, newer[0])
-    return Event("redetect", match.match_id,
-                 f"{newer[0]}: {deleted} model actions deleted, {inserted} inserted")
+    newer = MODEL_VERSIONS[latest + 1:]
+    return newer[0] if newer else None
 
 
 def run_stream(world: World, sink, conn, ticks: int, interval: float,
@@ -76,7 +89,8 @@ def run_stream(world: World, sink, conn, ticks: int, interval: float,
     for tick in range(ticks):
         if tick and interval > 0:
             time.sleep(interval)
-        # Captures and actions both move with every event, so the key never repeats.
+        # A summary of the database state. Every event changes that state, but
+        # a redetect that deletes as many actions as it inserts keeps the key.
         tick_key = conn.execute("SELECT (SELECT count(*) FROM tracking.capture), "
                                 "(SELECT count(*) FROM tracking.off_ball_action)").fetchone()
         event = next_event(world, sink, tuple(tick_key))
