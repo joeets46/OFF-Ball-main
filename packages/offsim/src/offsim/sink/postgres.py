@@ -30,6 +30,20 @@ class PostgresSink:
             self._copy("player", [p.row() for p in world.players])
             self._copy("match_squad", [s.row() for s in world.squads])
 
+    def write_match(self, world: World, match) -> None:
+        """A match that arrives after the backfill: its row and its squad."""
+        with self.conn.transaction():
+            self._copy("match", [match.row()])
+            self._copy("match_squad", [s.row() for s in world.squad(match)])
+
+    def delivered_match_ids(self) -> set[int]:
+        return {r[0] for r in self.conn.execute("SELECT match_id FROM tracking.match")}
+
+    def model_versions(self, match_id: int) -> set[str]:
+        return {r[0] for r in self.conn.execute(
+            "SELECT DISTINCT detection_model_version FROM tracking.off_ball_action "
+            "WHERE match_id = %s AND detection_model_version IS NOT NULL", [match_id])}
+
     # -- captures, frames, positions ----------------------------------------
 
     def write_recording(self, recording: Recording) -> int:

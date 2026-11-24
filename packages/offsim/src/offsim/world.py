@@ -299,6 +299,9 @@ class Recording:
                 continue
             next_k[f.period] = k + 1
             f.frame_number = (f.period - 1) * self.capture.frames_per_period + k
+            # On the vests' own 10 Hz clock, not the optical frame sampled.
+            period_start = f.captured_at - timedelta(milliseconds=period_index * 1000 / sim.fps)
+            f.captured_at = period_start + timedelta(milliseconds=k * 1000 / self.capture.fps)
             f.period_clock_ms = round(k * 1000 / self.capture.fps)
             f.ball, f.possession_side, f.ball_carrier_player_id = None, None, None
             f.ball_status = "alive"
