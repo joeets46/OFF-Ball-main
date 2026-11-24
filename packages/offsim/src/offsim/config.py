@@ -1,9 +1,9 @@
 """Profiles, the seed, and where things live.
 
 A profile says how much world to build. The volume is in the positions: 22
-players at 25 frames a second is 1,320 rows per match-second, so a full
-90-minute match is about three million rows and ``small`` stays small by
-playing short periods, not by thinning the frames.
+players at 25 frames a second is 550 rows per match-second (575 with the
+ball), so a full 90-minute match is about three million rows and ``small``
+stays small by playing short periods, not by thinning the frames.
 """
 
 from __future__ import annotations
