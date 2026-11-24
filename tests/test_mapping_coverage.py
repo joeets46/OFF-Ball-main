@@ -168,16 +168,19 @@ def test_ownership_map_matches_the_scope_boundary(upstream):
     )
 
 
-def test_all_ten_systems_own_something(in_scope_rows):
-    """Every named system is actually used.
+def test_every_named_system_owns_something(in_scope_rows):
+    """Every named system is actually used, and no source-only system is.
 
     A system named in the upstream model but owning no target table would mean
     either the ownership review missed something or the system does not belong
-    in the model.
+    in the model. A source-only system is the deliberate exception: the
+    upstream model has no table it could feed (docs/05-source-systems.md).
     """
     used = {r["source_system"] for r in in_scope_rows}
-    expected = {s.schema for s in SYSTEMS}
-    assert used == expected, f"systems owning nothing: {sorted(expected - used)}"
+    named = {s.schema for s in SYSTEMS if not s.source_only}
+    source_only = {s.schema for s in SYSTEMS if s.source_only}
+    assert named <= used, f"systems owning nothing: {sorted(named - used)}"
+    assert not used & source_only, f"source-only systems own tables: {sorted(used & source_only)}"
 
 
 def test_excluded_rows_state_what_would_be_needed(out_of_scope_rows):

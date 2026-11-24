@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     unknown_system = sorted(
         {r["source_system"] for r in in_scope_csv if r["source_system"] not in known_schemas}
     )
-    check("every source_system is one of the ten named systems", not unknown_system,
+    check("every source_system is a registered system", not unknown_system,
           f"unknown: {unknown_system}")
 
     valid_confidence = {"high", "medium", "low"}

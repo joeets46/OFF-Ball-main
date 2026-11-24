@@ -45,18 +45,20 @@ CATEGORY = {
     "sap_s4": "erp", "tm_axs": "ticketing", "sfdc_crm": "crm", "sap_sfsf": "hcm",
     "dalet": "mam", "adobe_aep": "cdp", "archtics": "ticketing",
     "shopify": "ecommerce", "workday_ap": "fpa", "hudl": "sports_analytics",
+    "tracking": "player_tracking",
 }
 EXTRACT = {
     "sap_s4": "cdc_log", "tm_axs": "cdc_log", "sfdc_crm": "api_incremental",
     "sap_sfsf": "api_incremental", "dalet": "cdc_log", "adobe_aep": "event_stream",
     "archtics": "cdc_log", "shopify": "webhook_plus_api",
     "workday_ap": "api_snapshot", "hudl": "api_incremental",
+    "tracking": "file_per_match",
 }
 CODE = {
     "sap_s4": "SAP_S4", "tm_axs": "TICKETMASTER", "sfdc_crm": "SALESFORCE",
     "sap_sfsf": "SUCCESSFACTORS", "dalet": "DALET", "adobe_aep": "ADOBE_AEP",
     "archtics": "ARCHTICS", "shopify": "SHOPIFY", "workday_ap": "WORKDAY_AP",
-    "hudl": "HUDL",
+    "hudl": "HUDL", "tracking": "TRACKING",
 }
 
 #: The business entities that exist in more than one source system and so need

@@ -336,7 +336,8 @@ VALUES
     ('ARCHTICS', 'archtics', 'Archtics', 'ticketing', 'A', 'cdc_log'),
     ('SHOPIFY', 'shopify', 'Shopify Plus', 'ecommerce', 'A', 'webhook_plus_api'),
     ('WORKDAY_AP', 'workday_ap', 'Workday Adaptive Planning', 'fpa', 'B', 'api_snapshot'),
-    ('HUDL', 'hudl', 'SportsCode / Hudl', 'sports_analytics', 'A', 'api_incremental');
+    ('HUDL', 'hudl', 'SportsCode / Hudl', 'sports_analytics', 'A', 'api_incremental'),
+    ('TRACKING', 'tracking', 'Football player tracking (optical / GPS)', 'player_tracking', 'A', 'file_per_match');
 
 -- -------------------------------------------------------------------------
 -- Cross-system identity resolution.

@@ -1,8 +1,9 @@
 """Scope boundary for the OLTP source model.
 
-Only the 10 operational systems of record named in the upstream Databricks MVM
-(``model.operational_systems_of_records``) are modeled. MVM tables that no
-named system can plausibly source are out of scope.
+The 10 operational systems of record named in the upstream Databricks MVM
+(``model.operational_systems_of_records``) are modeled, plus one source-only
+system the upstream model does not name. MVM tables that no named system can
+plausibly source are out of scope.
 
 This module is the single source of truth for that boundary. Everything else
 imports it, so the docs, the derived CSVs, the generated DDL and the
@@ -32,7 +33,7 @@ CACHE_PATH = Path(__file__).resolve().parent / ".cache" / "mvm_model.json"
 
 @dataclass(frozen=True)
 class SourceSystem:
-    """One of the ten named operational systems of record."""
+    """One modeled operational system of record."""
 
     schema: str
     name: str
@@ -40,9 +41,13 @@ class SourceSystem:
     #: Matched against each column's `references` and `description` text to
     #: measure how strongly a target table is associated with this system.
     pattern: re.Pattern[str]
+    #: Modeled on the source side only: the upstream model has no table this
+    #: system could feed, so it owns no target table by design.
+    source_only: bool = False
 
 
-#: The 10 systems of record, in the order the upstream model lists them.
+#: The 10 systems of record, in the order the upstream model lists them, then
+#: the source-only systems this project adds.
 SYSTEMS: tuple[SourceSystem, ...] = (
     SourceSystem("sap_s4", "SAP S/4HANA (FI/CO/MM/SD)", "A", re.compile(r"SAP S/4HANA", re.I)),
     SourceSystem("tm_axs", "Ticketmaster / AXS", "A", re.compile(r"Ticketmaster|AXS", re.I)),
@@ -56,6 +61,12 @@ SYSTEMS: tuple[SourceSystem, ...] = (
     SourceSystem("shopify", "Shopify Plus", "A", re.compile(r"Shopify", re.I)),
     SourceSystem("workday_ap", "Workday Adaptive Planning", "B", re.compile(r"Workday", re.I)),
     SourceSystem("hudl", "SportsCode / Hudl", "A", re.compile(r"Hudl|SportsCode", re.I)),
+    # Not named upstream, and no upstream table holds player positions, so it
+    # owns nothing. The pattern matches no upstream column; plain "tracking"
+    # would match 585 ("cost tracking", "order tracking") and invent affinity.
+    SourceSystem("tracking", "Football player tracking (optical / GPS)", "A",
+                 re.compile(r"player tracking|optical tracking|tracking data", re.I),
+                 source_only=True),
 )
 
 #: MVM tables excluded because no named system of record can source them.
