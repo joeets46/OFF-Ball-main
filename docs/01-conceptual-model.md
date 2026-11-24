@@ -1,6 +1,6 @@
 # Conceptual model
 
-38 business entities in five subject areas. No attributes beyond identifiers,
+64 business entities in five subject areas. No attributes beyond identifiers,
 no keys, no foreign keys, and many-to-many relationships left unresolved.
 
 The model itself is in [../models/conceptual/](../models/conceptual/):
@@ -143,5 +143,5 @@ rather than something any source system hands over.
 
 ## Next layer
 
-[02-logical-model.md](02-logical-model.md) — 169 entities in 3NF, with the
-supertypes and the 32 associative entities the upstream model drops.
+[02-logical-model.md](02-logical-model.md) — 176 entities in 3NF, with the
+supertypes and the 34 associative entities the upstream model drops.

@@ -3,13 +3,13 @@
 Rendered views of the five `.dbml` files. The DBML is authoritative — these
 diagrams omit most attributes so the structure stays readable.
 
-169 entities, 251 relationships, 32 of them associative. Counts are verified by
+176 entities, 266 relationships, 34 of them associative. Counts are verified by
 `tests/test_logical_model.py`, which also checks that every relationship
 resolves to a declared table and column.
 
 | Subject area | Entities | Relationships |
 |---|--:|--:|
-| Competition & Events | 37 | 54 |
+| Competition & Events | 44 | 69 |
 | Venue & Access | 26 | 35 |
 | Commerce & Fan | 44 | 64 |
 | Media & Rights | 28 | 37 |
@@ -131,6 +131,44 @@ model.** It is what a coded match event *means* — "shot, right foot, inside
 box, on target" is four rows. The upstream model has no equivalent anywhere, so
 the semantics of every match event are lost on the way into the lakehouse and
 only the aggregate number survives.
+
+### Off-ball tracking
+
+What the other 21 players are doing while one has the ball.
+
+```mermaid
+erDiagram
+    EVENT ||--o{ TRACKING_CAPTURE : "is recorded by"
+    TRACKING_CAPTURE ||--|{ TRACKING_FRAME : "is a sequence of"
+    TRACKING_FRAME ||--o{ ATHLETE_FRAME_POSITION : "places"
+    ATHLETE_FRAME_POSITION }o--|| ATHLETE : locates
+    TRACKING_FRAME }o--o| ATHLETE : "has ball carrier"
+
+    EVENT ||--o{ OFF_BALL_ACTION : "is the context of"
+    ATHLETE ||--o{ OFF_BALL_ACTION : performs
+    OFF_BALL_ACTION }o--|| OFF_BALL_ACTION_TYPE : "is a kind of"
+    OFF_BALL_ACTION }o--o| TRACKING_FRAME : "starts and ends at"
+    OFF_BALL_ACTION ||--o{ OFF_BALL_ACTION_ZONE : "moves through"
+    OFF_BALL_ACTION_ZONE }o--|| PITCH_ZONE : names
+    OFF_BALL_ACTION }o--o| MATCH_EVENT : "leads to"
+
+    TRACKING_CAPTURE { string capture_method }
+    TRACKING_FRAME { string frame_number }
+    ATHLETE_FRAME_POSITION { string pitch_x }
+    OFF_BALL_ACTION { string detection_method }
+    OFF_BALL_ACTION_TYPE { string phase }
+    OFF_BALL_ACTION_ZONE { string pitch_zone_id }
+    PITCH_ZONE { string zone_code }
+    EVENT { string event_category }
+    ATHLETE { string dominant_side }
+    MATCH_EVENT { string elapsed_minute }
+```
+
+**The ball carrier on `tracking_frame` is what defines off-ball.** Every other
+athlete in that frame is, by definition, off the ball. **`off_ball_action` links
+to the `match_event` it led to** — the run that created the shot — which is the
+question off-ball analysis exists to answer. The upstream model has no
+equivalent for any of these seven entities.
 
 ## 2. Venue & Access
 

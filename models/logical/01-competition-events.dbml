@@ -299,6 +299,100 @@ Table qualifier_group {
 }
 
 // -------------------------------------------------------------------------
+// Off-ball tracking
+//
+// match_event records the moments on the ball. Most of a football match is
+// the other 21 players moving without it: the run that drags a defender away,
+// the press that forces the turnover. None of that is a match event, so none
+// of it reaches the upstream model at all.
+// -------------------------------------------------------------------------
+
+Table tracking_capture {
+  tracking_capture_id identifier [pk]
+  event_id identifier [not null]
+  capture_method capture_method [not null, note: 'optical | gps | hybrid']
+  frames_per_second quantity [not null]
+  pitch_length_m quantity [not null]
+  pitch_width_m quantity [not null]
+  is_primary boolean [not null, note: 'A match can be captured twice, optical and GPS. Like a Hudl timeline, reading both double-counts every run.']
+  note: 'One recording of one event. Frame rate and pitch size belong here, not on each frame: they are the same for every frame of the capture.'
+}
+
+Table tracking_frame {
+  tracking_frame_id identifier [pk]
+  tracking_capture_id identifier [not null]
+  frame_number quantity [not null]
+  period_number quantity [not null]
+  captured_at instant [not null]
+  match_clock_ms quantity [not null]
+  ball_x quantity [note: 'Normalised 0..100, as match_event.pitch_x.']
+  ball_y quantity
+  ball_z quantity [note: 'Height. A lofted ball over a pressing line is an off-ball question.']
+  is_ball_in_play boolean [not null]
+  possession_team_id identifier
+  ball_carrier_athlete_id identifier [note: 'Null when the ball is loose. Every other athlete in the frame is, by definition, off the ball.']
+  indexes { (tracking_capture_id, frame_number) [unique] }
+  note: 'One instant of a capture: where the ball is and who has it.'
+}
+
+Table athlete_frame_position {
+  tracking_frame_id identifier [pk]
+  athlete_id identifier [pk]
+  pitch_x quantity [not null, note: 'Normalised 0..100, as match_event.pitch_x.']
+  pitch_y quantity [not null]
+  speed_mps quantity
+  note: '''
+    Associative: where one athlete is in one frame. The volume of the whole
+    model lives here -- 22 athletes at 25 frames a second over 90 minutes is
+    about three million rows per match. No team column: the team is already
+    known from event_participant_athlete.
+  '''
+}
+
+Table off_ball_action_type {
+  off_ball_action_type_id identifier [pk]
+  type_code code [not null, unique]
+  name name [not null]
+  phase possession_phase [not null, note: 'in_possession | out_of_possession']
+  note: 'Run in behind, decoy run, overlap, press, mark, cover, recovery run.'
+}
+
+Table off_ball_action {
+  off_ball_action_id identifier [pk]
+  event_id identifier [not null]
+  athlete_id identifier [not null]
+  off_ball_action_type_id identifier [not null]
+  start_frame_id identifier [note: 'Null when an analyst coded the action from video, with no tracking capture behind it.']
+  end_frame_id identifier
+  led_to_match_event_id identifier [note: 'The run that created the shot. This link is the reason off-ball work is done at all.']
+  detection_method detection_method [not null, note: 'model | analyst']
+  detection_confidence quantity [note: '0..1. Only for model-detected actions.']
+  note: '''
+    A movement by an athlete who does not have the ball. Start and end
+    positions and distance are not stored: they follow from the frames, and a
+    stored copy would eventually disagree with them.
+  '''
+}
+
+Table pitch_zone {
+  pitch_zone_id identifier [pk]
+  zone_code code [not null, unique]
+  name name [not null]
+  x_min quantity [not null]
+  x_max quantity [not null]
+  y_min quantity [not null]
+  y_max quantity [not null]
+  note: 'A named area on the 0..100 pitch -- a half-space, the final third, the box. What makes "space" something a query can ask about.'
+}
+
+Table off_ball_action_zone {
+  off_ball_action_id identifier [pk]
+  pitch_zone_id identifier [pk]
+  entered_frame_id identifier
+  note: 'Associative. A run in behind starts in one zone and ends in another, so one zone column cannot say where it went.'
+}
+
+// -------------------------------------------------------------------------
 // Athletes
 // -------------------------------------------------------------------------
 
@@ -474,6 +568,22 @@ Ref: match_event.team_id > team.team_id
 Ref: match_event_qualifier.match_event_id > match_event.match_event_id
 Ref: match_event_qualifier.qualifier_id > qualifier.qualifier_id
 Ref: qualifier.qualifier_group_id > qualifier_group.qualifier_group_id
+
+Ref: tracking_capture.event_id > event.event_id
+Ref: tracking_frame.tracking_capture_id > tracking_capture.tracking_capture_id
+Ref: tracking_frame.possession_team_id > team.team_id
+Ref: tracking_frame.ball_carrier_athlete_id > athlete.athlete_id
+Ref: athlete_frame_position.tracking_frame_id > tracking_frame.tracking_frame_id
+Ref: athlete_frame_position.athlete_id > athlete.athlete_id
+Ref: off_ball_action.event_id > event.event_id
+Ref: off_ball_action.athlete_id > athlete.athlete_id
+Ref: off_ball_action.off_ball_action_type_id > off_ball_action_type.off_ball_action_type_id
+Ref: off_ball_action.start_frame_id > tracking_frame.tracking_frame_id
+Ref: off_ball_action.end_frame_id > tracking_frame.tracking_frame_id
+Ref: off_ball_action.led_to_match_event_id > match_event.match_event_id
+Ref: off_ball_action_zone.off_ball_action_id > off_ball_action.off_ball_action_id
+Ref: off_ball_action_zone.pitch_zone_id > pitch_zone.pitch_zone_id
+Ref: off_ball_action_zone.entered_frame_id > tracking_frame.tracking_frame_id
 
 Ref: athlete.primary_position_id > position.position_id
 Ref: position.sport_id > sport.sport_id

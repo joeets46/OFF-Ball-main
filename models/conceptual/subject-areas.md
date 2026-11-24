@@ -4,7 +4,7 @@ Technology- and system-agnostic. No attributes beyond identifiers, no keys, no
 foreign keys, and many-to-many relationships left unresolved — resolving them
 is the logical model's job.
 
-The 38 entities below are grouped into five subject areas. The grouping is not
+The 64 entities below are grouped into five subject areas. The grouping is not
 the upstream model's 14 domains: domains are a *publishing* structure for a
 lakehouse, whereas subject areas are meant to be legible to someone who runs
 the business. Where the two differ, the mapping is stated.
@@ -61,6 +61,9 @@ Fixture.
 | **Official** | A person who officiates |
 | **Performance Measure** | A quantified assessment of an athlete in a fixture |
 | **Availability** | Whether an athlete can play, and why not |
+| **Tracking Frame** | Where every athlete and the ball are at one instant of a fixture |
+| **Off-Ball Action** | A movement by an athlete who does not have the ball — a run, a press, a mark |
+| **Pitch Zone** | A named area of the pitch, so that space can be talked about |
 
 **Fixture and Event are deliberately one entity.** A league match, a concert, a
 pay-per-view bout and an awards show are all *a scheduled thing that happens at
@@ -71,6 +74,13 @@ separate entities.
 **Franchise and Team are deliberately two.** A franchise persists through
 relocation, rebranding and relegation; a team is the squad that plays. The same
 franchise fields several teams at once, and the upstream model conflates them.
+
+**Off-ball play belongs here, next to Match Event.** A Match Event is a moment
+on the ball. For most of a match, 21 of the 22 players do not have it, and what
+they do — the run that drags a defender away, the press that forces a turnover
+— is often what decides the Match Event that follows. An Off-Ball Action can
+lead to a Match Event, which is how the two are connected. The upstream model
+has no equivalent for any of the three.
 
 ## 2. Venue & Access
 
@@ -204,5 +214,5 @@ real-time ticketing inventory.
 
 ## Diagram
 
-[conceptual-erd.md](conceptual-erd.md) draws all 38 entities and the
+[conceptual-erd.md](conceptual-erd.md) draws all 64 entities and the
 relationships above.

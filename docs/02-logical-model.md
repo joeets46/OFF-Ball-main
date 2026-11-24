@@ -1,6 +1,6 @@
 # Logical model
 
-169 entities in third normal form, platform-neutral. No vendor types, no
+176 entities in third normal form, platform-neutral. No vendor types, no
 physical keys, no indexes.
 
 The model is in [../models/logical/](../models/logical/), five files by subject area, with
@@ -9,12 +9,12 @@ The model is in [../models/logical/](../models/logical/), five files by subject 
 
 | Subject area | Entities | Relationships |
 |---|--:|--:|
-| Competition & Events | 37 | 54 |
+| Competition & Events | 44 | 69 |
 | Venue & Access | 26 | 35 |
 | Commerce & Fan | 44 | 64 |
 | Media & Rights | 28 | 37 |
 | Corporate | 34 | 61 |
-| **Total** | **169** | **251** |
+| **Total** | **176** | **266** |
 
 `tests/test_logical_model.py` verifies every relationship resolves to a
 declared table and column, every entity has an identifier, and the supertypes
@@ -22,7 +22,7 @@ are present with their subtypes keyed on the parent.
 
 ## The four things normalization changed
 
-### 1. 32 associative entities, against the upstream model's 6
+### 1. 34 associative entities, against the upstream model's 6
 
 The upstream readme is explicit that the MVM "minimises M:N associations and
 relies on direct foreign key relationships for simplicity". Only 6 of its 200

@@ -6,8 +6,8 @@ Read in order for the full argument, or jump to what you need.
 
 | # | Doc | The layer |
 |--:|---|---|
-| 01 | [01-conceptual-model.md](01-conceptual-model.md) | 38 business entities, 5 subject areas, no attributes |
-| 02 | [02-logical-model.md](02-logical-model.md) | 169 entities in 3NF, supertypes, 32 associative entities |
+| 01 | [01-conceptual-model.md](01-conceptual-model.md) | 64 business entities, 5 subject areas, no attributes |
+| 02 | [02-logical-model.md](02-logical-model.md) | 176 entities in 3NF, supertypes, 34 associative entities |
 | 03 | [03-physical-model-oltp.md](03-physical-model-oltp.md) | 10 PostgreSQL 18 schemas, 255 tables |
 | 04 | [04-physical-model-target.md](04-physical-model-target.md) | The upstream Databricks model as a constraint, plus its two measured defects |
 

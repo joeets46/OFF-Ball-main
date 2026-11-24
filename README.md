@@ -30,7 +30,7 @@ then reviewing the result by hand. The measurement lives in
 
 | Layer | Location | What it is |
 |---|---|---|
-| **Conceptual** | [models/conceptual/](models/conceptual/) | ~38 business entities in 5 subject areas, no attributes, M:N unresolved |
+| **Conceptual** | [models/conceptual/](models/conceptual/) | 64 business entities in 5 subject areas, no attributes, M:N unresolved |
 | **Logical** | [models/logical/](models/logical/) | Platform-neutral 3NF: supertypes, resolved associative entities, normalized value domains |
 | **Physical (source)** | [models/physical/](models/physical/) | **10 PostgreSQL 18 schemas**, one per system of record, each in its native idiom |
 | **Physical (target)** | [target/](target/) | The upstream Silver-layer model as a constraint on the sources — copied verbatim to [source/mvm/](source/mvm/), documented here, not re-modeled |

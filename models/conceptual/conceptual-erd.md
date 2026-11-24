@@ -1,6 +1,6 @@
 # Conceptual ERD
 
-38 entities in five subject areas. Identifying attributes only — no keys, no
+64 entities in five subject areas. Identifying attributes only — no keys, no
 types, no foreign keys. Many-to-many relationships are drawn as such and are
 resolved in the [logical model](../logical/).
 
@@ -42,6 +42,12 @@ erDiagram
     AGENCY ||--|{ AGENT : "employs"
     OFFICIAL }o--o{ FIXTURE : "officiates"
     MATCH_EVENT }o--o| ATHLETE : "is attributed to"
+    FIXTURE ||--o{ TRACKING_FRAME : "is captured as"
+    ATHLETE }o--o{ TRACKING_FRAME : "is located in"
+    ATHLETE ||--o{ OFF_BALL_ACTION : "performs"
+    FIXTURE ||--o{ OFF_BALL_ACTION : "is the context of"
+    OFF_BALL_ACTION }o--o{ PITCH_ZONE : "moves through"
+    OFF_BALL_ACTION }o--o| MATCH_EVENT : "leads to"
 
     LEAGUE { string name }
     CONFERENCE { string name }
@@ -60,6 +66,9 @@ erDiagram
     AGENT { string name }
     AGENCY { string name }
     OFFICIAL { string name }
+    TRACKING_FRAME { string instant }
+    OFF_BALL_ACTION { string kind }
+    PITCH_ZONE { string name }
 ```
 
 Two deliberate choices to notice. **Fixture covers every kind of event** — a
