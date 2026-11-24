@@ -7,8 +7,14 @@ from __future__ import annotations
 
 from collections import Counter
 
+import dataclasses
+import json
+
 from offsim import schema
 from offsim.config import PROFILES
+from offsim.lifecycle import detect, plant
+from offsim.sink import FileSink
+from offsim.values.pitch import zones
 from offsim.world import build_world
 
 
@@ -32,23 +38,23 @@ def _first_frames(world, n=200):
     return [(f.row(capture), f.positions) for f in frames]
 
 
-def test_same_seed_same_world(tiny, seed):
-    a, b = build_world(tiny, seed), build_world(tiny, seed)
+def test_same_seed_same_world(make_world):
+    a, b = make_world(), make_world()
     assert [m.row() for m in a.matches] == [m.row() for m in b.matches]
     assert [p.row() for p in a.players] == [p.row() for p in b.players]
     assert _first_frames(a) == _first_frames(b)
 
 
-def test_different_seed_different_world(tiny, seed):
-    a, b = build_world(tiny, seed), build_world(tiny, seed + 1)
+def test_different_seed_different_world(make_world, seed):
+    a, b = make_world(), make_world(seed=seed + 1)
     assert [m.hudl_game_id for m in a.matches] != [m.hudl_game_id for m in b.matches]
     assert _first_frames(a, 5) != _first_frames(b, 5)
 
 
-def test_one_match_rebuilds_alone(world, recorded, tiny, seed):
+def test_one_match_rebuilds_alone(world, recorded, make_world):
     """Match 2 is the same whether or not match 1 was generated first."""
     capture = world.captures(world.matches[1])[0]
-    alone = list(build_world(tiny, seed).record(capture).frames())
+    alone = list(make_world().record(capture).frames())
     assert [f.positions for f in alone] == [f.positions for f in recorded[capture.key][1]]
 
 
@@ -175,3 +181,73 @@ def test_centimetre_captures_are_a_hundred_times_larger(world, recorded):
         if c.method == "optical":
             spans[c.coordinate_unit] = max(abs(x) for f in frames[:50] for _, x, _, _ in f.positions)
     assert spans["cm"] > 30 * spans["m"]
+
+
+# -- values, scenarios, detection, sinks -------------------------------------------
+
+def test_names_are_invented_and_unique(world):
+    assert len({t.name for t in world.teams}) == len(world.teams)
+    assert all(not t.name.startswith("Club ") for t in world.teams)
+    for t in world.teams:
+        assert 90 <= t.pitch_length_m <= 120 and 45 <= t.pitch_width_m <= 90
+
+
+def test_zones_come_from_the_ddl():
+    z = zones()
+    assert set(z) == {"DEFENSIVE_THIRD", "MIDDLE_THIRD", "FINAL_THIRD", "PENALTY_BOX",
+                      "LEFT_HALF_SPACE", "RIGHT_HALF_SPACE"}
+    # y grows towards the attacking team's left (20_reference.sql).
+    assert z["LEFT_HALF_SPACE"][2] > 50 > z["RIGHT_HALF_SPACE"][3]
+
+
+def _longer_match(make_world, tiny):
+    world = make_world(dataclasses.replace(tiny, matches=1, period_minutes=2))
+    return world, world.matches[0], plant(world, world.matches[0])
+
+
+def test_every_scenario_plants_its_action(make_world, tiny):
+    _, _, actions = _longer_match(make_world, tiny)
+    assert {a.type_code for a in actions} == {
+        "RUN_IN_BEHIND", "DECOY_RUN", "OVERLAP", "PRESS", "MARK"}
+    assert all(a.start_frame_number < a.end_frame_number for a in actions)
+    assert all(a.zones for a in actions), "every action passes through some zone"
+    assert any(a.led_to_hudl_instance_id for a in actions if a.type_code == "RUN_IN_BEHIND")
+
+
+def test_a_player_does_one_thing_at_a_time(make_world, tiny):
+    _, _, actions = _longer_match(make_world, tiny)
+    by_player = {}
+    for a in actions:
+        by_player.setdefault(a.player_id, []).append((a.start_frame_number, a.end_frame_number))
+    for spans in by_player.values():
+        spans.sort()
+        assert all(prev[1] <= nxt[0] for prev, nxt in zip(spans, spans[1:]))
+
+
+def test_detection_rows_fit_the_ddl_and_rules(make_world, tiny):
+    world, match, actions = _longer_match(make_world, tiny)
+    rows = detect(world, match, actions)
+    assert rows and rows == detect(world, match, actions), "deterministic"
+    assert not [p for r in rows for p in schema.check_row("off_ball_action", r)]
+    for r in rows:
+        if r["detection_method"] == "analyst":
+            assert r["_start_frame_number"] is None and r["detection_confidence"] is None
+        else:
+            assert r["detection_model_version"] and 0.6 <= r["detection_confidence"] <= 1
+    rerun = detect(world, match, actions, "offsim-detect-1.1", include_analyst=False)
+    assert {r["detection_method"] for r in rerun} == {"model"}
+    assert [r["detection_confidence"] for r in rerun] != \
+           [r["detection_confidence"] for r in rows if r["detection_method"] == "model"]
+
+
+def test_file_sink_writes_one_file_per_capture(world, tmp_path):
+    sink = FileSink(tmp_path)
+    sink.write_masters(world)
+    match = world.matches[1]
+    for capture in world.captures(match):
+        sink.write_recording(world.record(capture))
+    names = sorted(p.name for p in tmp_path.iterdir())
+    assert f"capture_{match.match_id}_gps_v1.jsonl" in names
+    lines = (tmp_path / f"capture_{match.match_id}_optical_v1.jsonl").read_text().splitlines()
+    assert json.loads(lines[0])["capture"]["coordinate_unit"] == "cm"
+    assert len(lines) == 1 + 2 * world.captures(match)[0].frames_per_period

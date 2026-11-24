@@ -10,6 +10,8 @@
 -- Pitch zones. Defined once, in normalised coordinates (0..100, attacking
 -- towards x = 100), so a zone means the same on every pitch and in both
 -- halves. Raw frame coordinates must be normalised before a zone test.
+-- With right-handed axes, y grows towards the attacking team's left: y = 0
+-- is their right touchline, y = 100 their left.
 -- -------------------------------------------------------------------------
 CREATE TABLE tracking.pitch_zone (
     pitch_zone_id       SMALLINT     GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -36,8 +38,8 @@ VALUES
     ('MIDDLE_THIRD',     'Middle third',    33.33,  66.67,  0.00, 100.00),
     ('FINAL_THIRD',      'Final third',     66.67, 100.00,  0.00, 100.00),
     ('PENALTY_BOX',      'Penalty box',     84.29, 100.00, 20.35,  79.65),
-    ('LEFT_HALF_SPACE',  'Left half-space',  0.00, 100.00, 20.35,  36.53),
-    ('RIGHT_HALF_SPACE', 'Right half-space', 0.00, 100.00, 63.47,  79.65);
+    ('RIGHT_HALF_SPACE', 'Right half-space', 0.00, 100.00, 20.35,  36.53),
+    ('LEFT_HALF_SPACE',  'Left half-space',  0.00, 100.00, 63.47,  79.65);
 
 -- -------------------------------------------------------------------------
 -- Off-ball action types. The phase says whose ball it is: a run is made in

@@ -19,11 +19,13 @@ import math
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Iterator, Protocol, Sequence
+from typing import Callable, Iterator, Protocol, Sequence
 
 from .config import DEFAULT_SEED, TEAMS, Profile
 from .registry import Registry
 from .rng import rng_for
+from .values.names import club_name, player_name
+from .values.pitch import pitch_size, zones_at
 
 SEASON_START = datetime(2026, 2, 7, 15, 0, tzinfo=timezone.utc)
 HALF_TIME = timedelta(minutes=15)
@@ -31,7 +33,8 @@ HALF_TIME = timedelta(minutes=15)
 DELIVERY_DELAY = timedelta(hours=3)
 
 #: A 4-4-2 in team-frame normalised coordinates: 0..100, attacking towards
-#: x = 100, y = 0 on the team's right.
+#: x = 100, y = 0 on the team's right touchline -- the convention the pitch
+#: zones in 20_reference.sql are seeded in.
 FORMATION: tuple[tuple[str, float, float], ...] = (
     ("GK", 6, 50),
     ("DEF", 22, 15), ("DEF", 20, 38), ("DEF", 20, 62), ("DEF", 22, 85),
@@ -242,7 +245,8 @@ class OffBallAction:
     type_code: str
     start_frame_number: int
     end_frame_number: int
-    zone_codes: list[str] = field(default_factory=list)
+    #: zone_code -> the frame the player first entered it.
+    zones: dict[str, int] = field(default_factory=dict)
     led_to_hudl_instance_id: str | None = None
 
 
@@ -250,11 +254,15 @@ class Scenario(Protocol):
     """Something that steers players for a while and records what it did.
 
     Called once per frame, before players move. Returns target overrides --
-    player_id -> (x, y, sprint) in home-frame metres -- and appends to
-    ``sim.actions`` when an action completes.
+    player_id -> (x, y, sprint) in home-frame metres -- and calls
+    ``sim.finish`` when an action completes.
     """
 
-    def step(self, sim: "MatchSim") -> dict[int, tuple[float, float, bool]]: ...
+    def step(self) -> dict[int, tuple[float, float, bool]]: ...
+
+
+#: Builds one scenario for one simulated match, with its own random stream.
+ScenarioFactory = Callable[["MatchSim", random.Random], Scenario]
 
 
 class Recording:
@@ -264,7 +272,7 @@ class Recording:
     have been read to the end.
     """
 
-    def __init__(self, world: "World", capture: Capture, scenarios: Sequence[Scenario]):
+    def __init__(self, world: "World", capture: Capture, scenarios: Sequence[ScenarioFactory]):
         self.world = world
         self.capture = capture
         self.scenarios = scenarios
@@ -329,7 +337,7 @@ class World:
     squads: list[SquadEntry]
     #: match_id -> side -> (starter slot replaced at half time, substitute id)
     substitutions: dict[int, dict[str, tuple[int, int]]]
-    scenarios: tuple[Scenario, ...] = ()
+    scenarios: tuple[ScenarioFactory, ...] = ()
 
     def team_players(self, team_key: int) -> list[Player]:
         return [p for p in self.players if p.team_key == team_key]
@@ -368,9 +376,10 @@ class World:
 
 
 def build_world(profile: Profile, seed: int = DEFAULT_SEED,
-                scenarios: Sequence[Scenario] = ()) -> World:
+                scenarios: Sequence[ScenarioFactory] = ()) -> World:
     registry = Registry(seed)
-    teams = [_team(key, seed) for key in range(TEAMS)]
+    taken: set[str] = set()
+    teams = [_team(key, seed, taken) for key in range(TEAMS)]
 
     players: list[Player] = []
     for team in teams:
@@ -379,10 +388,11 @@ def build_world(profile: Profile, seed: int = DEFAULT_SEED,
         for index, (role, slot) in enumerate(roles):
             player_id = registry.player_id(team.key, index)
             r = rng_for(seed, "player", player_id)
+            name = player_name(r)
             top = r.uniform(7.8, 8.6) if role == "GK" else r.uniform(8.6, 9.8)
             players.append(Player(
                 player_id=player_id, team_key=team.key,
-                display_name=f"{team.short_name} {index + 1}",
+                display_name=name,
                 shirt_number=index + 1, role=role, slot=slot,
                 max_speed_mps=round(top, 2),
                 hudl_player_id=registry.hudl_player_id(player_id),
@@ -422,12 +432,12 @@ def build_world(profile: Profile, seed: int = DEFAULT_SEED,
                  tuple(scenarios))
 
 
-def _team(key: int, seed: int) -> Team:
+def _team(key: int, seed: int, taken: set[str]) -> Team:
     r = rng_for(seed, "team", key)
-    letter = "ABCDEFGH"[key]
-    return Team(key=key, name=f"Club {letter}", short_name=letter * 3,
-                pitch_length_m=float(r.choice((100, 102, 105, 105, 110))),
-                pitch_width_m=float(r.choice((64, 66, 68, 68, 70))))
+    name, short = club_name(r, taken)
+    length, width = pitch_size(r)
+    return Team(key=key, name=name, short_name=short,
+                pitch_length_m=length, pitch_width_m=width)
 
 
 def _double_round_robin(n: int) -> list[tuple[int, int]]:
@@ -462,9 +472,8 @@ class MatchSim:
     """
 
     def __init__(self, world: World, match: Match, fps: int, rng: random.Random,
-                 scenarios: Sequence[Scenario] = ()):
+                 scenarios: Sequence[ScenarioFactory] = ()):
         self.world, self.match, self.rng = world, match, rng
-        self.scenarios = scenarios
         self.fps = fps
         self.dt = 1.0 / fps
         self.length, self.width = match.pitch_length_m, match.pitch_width_m
@@ -486,6 +495,48 @@ class MatchSim:
         self._flight: tuple[list[float], list[float], float, float, int] | None = None
         self._hold = 0.0
         self._dead = 0.0
+        # Scenario bookkeeping: one action per player at a time.
+        self.busy: set[int] = set()
+        self._registry = Registry(world.seed)
+        self._instances = 0
+        self.scenarios = [
+            factory(self, rng_for(world.seed, "match", match.match_id, "scenario",
+                                  getattr(factory, "__name__", str(i))))
+            for i, factory in enumerate(scenarios)
+        ]
+
+    # -- helpers for scenarios --------------------------------------------
+
+    def role(self, player_id: int) -> str:
+        return FORMATION[self._slot[player_id]][0]
+
+    def slot(self, player_id: int) -> int:
+        return self._slot[player_id]
+
+    def players(self, side: str) -> list[int]:
+        return [pid for pid, s, _ in self.on_pitch if s == side]
+
+    def normalised(self, player_id: int) -> tuple[float, float]:
+        """Team-frame 0..100 position, attacking towards 100 -- the zones' frame."""
+        side = self.side[player_id]
+        x, y = self.to_home(side, *self.pos[player_id])
+        return x / self.length * 100, y / self.width * 100
+
+    def zones_now(self, player_id: int) -> list[str]:
+        return zones_at(*self.normalised(player_id))
+
+    def from_team(self, side: str, xn: float, yn: float) -> tuple[float, float]:
+        """Team-frame 0..100 -> home-frame metres."""
+        return self.to_home(side, xn / 100 * self.length, yn / 100 * self.width)
+
+    def finish(self, action: OffBallAction, leads_to_shot: bool = False) -> None:
+        """Record a completed action, optionally linking it to a Hudl shot instance."""
+        if leads_to_shot:
+            self._instances += 1
+            action.led_to_hudl_instance_id = self._registry.hudl_instance_id(
+                self.match.match_id, self._instances)
+        self.actions.append(action)
+        self.busy.discard(action.player_id)
 
     # -- frames of reference ------------------------------------------------
 
@@ -525,7 +576,7 @@ class MatchSim:
                 self.frame_number = (period - 1) * self.frames_per_period + i
                 overrides: dict[int, tuple[float, float, bool]] = {}
                 for scenario in self.scenarios:
-                    overrides.update(scenario.step(self))
+                    overrides.update(scenario.step())
                 self._move_players(overrides)
                 self._move_ball()
                 yield Frame(
@@ -542,6 +593,7 @@ class MatchSim:
 
     def _kickoff(self, period: int) -> None:
         self.period = period
+        self.busy.clear()     # half time ends any action in progress
         self.on_pitch = self.world.lineup(self.match, period)
         self.side = {pid: side for pid, side, _ in self.on_pitch}
         self._slot = {pid: slot for pid, _, slot in self.on_pitch}

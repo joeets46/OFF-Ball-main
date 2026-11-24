@@ -11,6 +11,7 @@ import dataclasses
 import pytest
 
 from offsim.config import PROFILES
+from offsim.scenarios import DEFAULT_SCENARIOS
 from offsim.world import build_world
 
 SEED = 7
@@ -28,8 +29,14 @@ def tiny():
 
 
 @pytest.fixture(scope="session")
-def world():
-    return build_world(TINY, SEED)
+def make_world():
+    """build_world with the default scenarios, as backfill uses it."""
+    return lambda profile=TINY, seed=SEED: build_world(profile, seed, DEFAULT_SCENARIOS)
+
+
+@pytest.fixture(scope="session")
+def world(make_world):
+    return make_world()
 
 
 @pytest.fixture(scope="session")
