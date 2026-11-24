@@ -109,6 +109,11 @@ BREAKAGES = {
         CHECK[3],
         "UPDATE tracking.capture SET coordinate_unit = 'm' WHERE coordinate_unit = 'cm'",
     ),
+    "ends not swapped at half time": (
+        CHECK[3],
+        "UPDATE tracking.capture_period SET home_attacks_positive_x = NOT home_attacks_positive_x "
+        "WHERE period = 2",
+    ),
 }
 
 

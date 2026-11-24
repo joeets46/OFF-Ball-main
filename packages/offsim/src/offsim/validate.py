@@ -64,8 +64,9 @@ BUSINESS_CHECKS: tuple[tuple[str, str, str], ...] = (
         "normalised positions on the pitch",
         "unit, origin or direction of play applied wrongly",
         """
-        WITH n AS (
-            SELECT p.frame_id, p.player_id,
+        WITH n AS NOT MATERIALIZED (
+            SELECT p.frame_id, p.player_id, c.capture_id, f.period, ms.team_side,
+                   ms.is_goalkeeper,
                    (p.x / CASE c.coordinate_unit WHEN 'cm' THEN 100 ELSE 1 END
                         / m.pitch_length_m + 0.5) * 100 AS xr,
                    (p.y / CASE c.coordinate_unit WHEN 'cm' THEN 100 ELSE 1 END
@@ -80,11 +81,22 @@ BUSINESS_CHECKS: tuple[tuple[str, str, str], ...] = (
             JOIN tracking.match_squad ms
               ON ms.match_id = c.match_id AND ms.player_id = p.player_id
             WHERE c.coordinate_origin = 'centre'
+        ), t AS NOT MATERIALIZED (
+            SELECT n.*, CASE WHEN attacks_positive THEN xr ELSE 100 - xr END AS tx,
+                        CASE WHEN attacks_positive THEN yr ELSE 100 - yr END AS ty
+            FROM n
         )
         SELECT frame_id || '/' || player_id
-        FROM n
-        WHERE NOT (CASE WHEN attacks_positive THEN xr ELSE 100 - xr END BETWEEN -5 AND 105
-               AND CASE WHEN attacks_positive THEN yr ELSE 100 - yr END BETWEEN -5 AND 105)
+        FROM t
+        WHERE NOT (tx BETWEEN -5 AND 105 AND ty BETWEEN -5 AND 105)
+        UNION ALL
+        -- A flipped half still lands on the pitch, so direction shows in the
+        -- keeper: in their own team's frame they defend the low end.
+        SELECT capture_id || '/period ' || period || '/' || team_side || ' keeper upfield'
+        FROM t
+        WHERE is_goalkeeper
+        GROUP BY capture_id, period, team_side
+        HAVING avg(tx) > 50
         """,
     ),
 )
