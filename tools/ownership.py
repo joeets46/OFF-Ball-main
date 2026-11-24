@@ -13,6 +13,10 @@ whose owner is obvious from context -- and are assigned here explicitly.
 ``check_mapping`` asserts that every ``src`` table named below actually exists
 in the generated DDL, so this file cannot drift from ``models/physical/``.
 
+Source-only systems (``SourceSystem.source_only``, currently ``tracking``) are
+absent by design: the upstream model has no table they could feed, and a test
+asserts they own nothing.
+
 Row shape: ``[mvm_table, system, src, transform, confidence, note?]``
 
 transform

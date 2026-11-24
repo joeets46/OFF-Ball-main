@@ -400,8 +400,8 @@ INSERT INTO common.canonical_entity (entity_type, target_domain, target_table, t
 VALUES
     ('fan', 'fan', 'fan_profile', 'fan_profile_id', 'The same person exists as a Salesforce Contact, a TM/AXS customer_account, a Shopify customer and an AEP profile'),
     ('venue', 'venue', 'venue', 'venue_id', 'Archtics building, TM/AXS venue_ref and SAP t001w plant all describe the same building'),
-    ('fixture', 'event', 'fixture', 'fixture_id', 'TM/AXS event, Archtics event_manifest and Hudl game are the same fixture'),
-    ('athlete', 'athlete', 'athlete_profile', 'athlete_profile_id', 'SuccessFactors per_person and Hudl player are the same athlete'),
+    ('fixture', 'event', 'fixture', 'fixture_id', 'TM/AXS event, Archtics event_manifest, Hudl game and tracking match are the same fixture'),
+    ('athlete', 'athlete', 'athlete_profile', 'athlete_profile_id', 'SuccessFactors per_person, Hudl player and tracking player are the same athlete'),
     ('franchise', 'league', 'franchise', 'franchise_id', 'SAP company code, SAP profit centre, Salesforce Account and Hudl team are the same club'),
     ('sponsor', 'sponsorship', 'sponsor', 'sponsor_id', 'Salesforce Account and SAP customer (kna1) are the same commercial counterparty'),
     ('supplier', 'merchandise', 'supplier', 'supplier_id', 'SAP vendor (lfa1) and Shopify vendor string are the same supplier'),
