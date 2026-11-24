@@ -36,8 +36,20 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["tools"]
 
+# offsim, the fake data generator for the tracking schema, is its own package.
+# As a workspace member in the default dev group, `uv run` installs it, so
+# `uv run offsim ...` and `uv run pytest` work with no extra step.
+[dependency-groups]
+dev = ["offsim"]
+
+[tool.uv.workspace]
+members = ["packages/offsim"]
+
+[tool.uv.sources]
+offsim = { workspace = true }
+
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "packages/offsim/tests"]
 # Quiet, but show which assertion failed and why.
 addopts = "-ra --strict-markers"
 markers = [
